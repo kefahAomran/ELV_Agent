@@ -1,0 +1,5 @@
+{
+  "dependencies": {
+    "@npcoder/puter-api": "^2.0.0"
+  }
+}

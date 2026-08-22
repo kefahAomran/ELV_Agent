@@ -1,0 +1,107 @@
+# ELV Site Intelligence Agent
+
+> 🚧 **Status: Work in Progress (v0.1 - early prototype)**
+> This is an early-stage internal tool. Core agent loop and Excel-based
+> tools are functional; several features listed below are still in
+> active development. Not production-ready.
+
+## Overview
+
+An AI agent for ELV (Extra Low Voltage) site engineers to query project
+progress data (CCTV, access control, fire alarm, structured cabling,
+video intercom, gate barriers) and technical documents in natural
+language, in Arabic and English.
+
+Built for **Project 128** (residential development, Dubai Hills Estate)
+as both a practical site tool and a learning project in applied AI
+agent engineering.
+
+## Tech Stack
+
+- **Language:** Python
+- **Agent framework:** LangChain (manual tool-calling loop)
+- **LLM provider:** Groq API
+- **Data source:** Excel (openpyxl) — flats & floors progress tracking
+- **RAG:** ChromaDB + sentence-transformers (PyMuPDF for PDF parsing)
+- **Web framework:** Flask (REST API)
+- **Planned UI:** Streamlit (mobile-friendly)
+
+## Features
+
+### ✅ Working
+- [x] Excel parser for Flats/Floors progress data
+- [x] 7 tool functions (flat status, system progress, floor completion, etc.)
+- [x] Agent loop with tool-calling, history trimming, error handling
+- [x] Bilingual (AR/EN) system prompt with tool-use rules
+- [x] RAG pipeline skeleton for PDF document search
+- [x] REST API (Flask): chat, file upload/list/delete, logs
+
+### 🔧 In Progress
+- [ ] Finalizing LLM provider configuration (model deprecations on Groq
+      side required updating model IDs — see `tools.py` `build_llm()`)
+- [ ] Streamlit front-end for mobile access
+
+### 📋 Planned
+- [ ] Hybrid search for RAG (keyword + semantic)
+- [ ] DWG file support
+- [ ] Evaluation: Manual Tool Calling vs. LCEL vs. built-in LangChain agents
+- [ ] Deployment (currently Flask dev server only — not production WSGI)
+
+## Setup
+
+```bash
+# 1. Clone and enter the project
+git clone <your-repo-url>
+cd elv-site-intelligence-agent
+
+# 2. Create virtual environment
+python -m venv venv
+venv\Scripts\activate      # Windows
+# source venv/bin/activate  # macOS/Linux
+
+# 3. Install dependencies
+pip install -r requirements.txt
+
+# 4. Configure environment variables
+copy .env.example .env     # Windows
+# cp .env.example .env      # macOS/Linux
+# then edit .env and add your GROQ_API_KEY
+
+# 5. Run the app
+python app.py
+```
+
+## Project Structure
+
+```
+.
+├── app.py                 # Flask app + agent loop
+├── tools.py                # Tool definitions, TOOL_MAP, LLM setup
+├── excel_parser.py         # Excel data extraction (Flats/Floors)
+├── 08_rag_pipeline.py      # RAG index builder (PyMuPDF + ChromaDB)
+├── docs/                   # Uploaded project files (gitignored)
+├── chroma_db/               # Vector store (gitignored)
+├── .env.example             # Environment variable template
+└── requirements.txt
+```
+
+## Known Issues
+
+- Groq periodically deprecates models — if you see `model_decommissioned`
+  or `404 model not found`, check `console.groq.com/docs/deprecations`
+  and update the model ID in `tools.py`.
+- Flask dev server only — needs a production WSGI server before deployment.
+
+## Contributing
+
+This is currently a solo learning project. Commit convention in use:
+
+- `feat:` new feature
+- `fix:` bug fix
+- `docs:` documentation only
+- `chore:` tooling/config/dependencies
+- `refactor:` code change with no behavior change
+
+## License
+
+Internal/unlicensed — private project.

@@ -1,0 +1,45 @@
+# بيئة Python
+venv/
+env/
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# قاعدة البيانات
+chroma_db/
+*.db
+*.sqlite
+
+# الملفات الحساسة
+.env
+.env.local
+*.key
+*.pem
+
+# السجلات
+*.log
+puter-api.log
+
+# ملفات النظام
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# ملفات كبيرة مؤقتة
+*.zip
+*.tar.gz
+*.7z
+
+# ملفات Excel الكبيرة (إذا كان حجمها كبيراً)
+# *.xlsx
+# *.xls
+venv/
+pdfs/

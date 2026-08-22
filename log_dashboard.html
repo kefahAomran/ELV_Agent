@@ -1,0 +1,75 @@
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>لوحة تحكم السجلات - ELV Agent</title>
+    <link rel="stylesheet" href="log_style.css">
+</head>
+<body>
+
+<div class="dashboard-container">
+    <!-- Header -->
+    <header class="dashboard-header">
+        <h1>📊 لوحة تحكم السجلات</h1>
+        <p>مراقبة نشاط وكيل ELV في الوقت الفعلي</p>
+    </header>
+
+    <!-- Controls Section -->
+    <section class="controls-section">
+        <div class="search-box">
+            <input 
+                id="searchInput" 
+                type="text" 
+                placeholder="ابحث في السجلات..."
+                class="search-input"
+            >
+            <button id="clearSearchBtn" class="clear-btn" title="مسح البحث">✕</button>
+        </div>
+
+        <div class="filter-buttons">
+            <button class="filter-btn active" data-filter="ALL">الكل</button>
+            <button class="filter-btn" data-filter="USER">المستخدم</button>
+            <button class="filter-btn" data-filter="LLM">LLM</button>
+            <button class="filter-btn" data-filter="TOOL">الأدوات</button>
+            <button class="filter-btn" data-filter="ERROR">الأخطاء</button>
+        </div>
+
+        <button id="refreshBtn" class="refresh-btn" title="تحديث يدوي">🔄 تحديث</button>
+        <button id="clearLogsBtn" class="clear-logs-btn" title="حذف جميع السجلات">🗑️ حذف السجلات</button>
+    </section>
+
+    <!-- Stats Section -->
+    <section class="stats-section">
+        <div class="stat-box">
+            <label>إجمالي السجلات</label>
+            <span id="totalLogs">0</span>
+        </div>
+        <div class="stat-box">
+            <label>السجلات المعروضة</label>
+            <span id="visibleLogs">0</span>
+        </div>
+        <div class="stat-box">
+            <label>آخر تحديث</label>
+            <span id="lastUpdateTime">--:--</span>
+        </div>
+    </section>
+
+    <!-- Logs Container -->
+    <section class="logs-section">
+        <div id="logsContainer" class="logs-container"></div>
+        <div id="emptyState" class="empty-state" style="display: none;">
+            <p>📭 لا توجد سجلات لعرضها</p>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="dashboard-footer">
+        <p>تحديث تلقائي كل 5 ثوان | ELV Agent Logs Dashboard</p>
+    </footer>
+</div>
+
+<script src="log_app.js"></script>
+</body>
+</html>

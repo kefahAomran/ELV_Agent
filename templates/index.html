@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ELV Agent – إدارة المشاريع</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #f4f6f9; padding: 20px; }
+    .container { max-width: 1200px; margin: auto; display: flex; gap: 20px; height: 90vh; }
+    .sidebar { width: 300px; background: white; border-radius: 12px; padding: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow-y: auto; }
+    .chat-area { flex: 1; background: white; border-radius: 12px; display: flex; flex-direction: column; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .chat-header { padding: 20px; border-bottom: 1px solid #eee; font-weight: bold; font-size: 18px; }
+    .chat-messages { flex: 1; padding: 20px; overflow-y: auto; background: #fafbfc; }
+    .message { margin-bottom: 12px; padding: 10px 16px; border-radius: 8px; max-width: 80%; }
+    .user { background: #0078d7; color: white; align-self: flex-end; margin-left: auto; }
+    .agent { background: #e9ecef; color: #333; }
+    .chat-input { display: flex; padding: 15px; border-top: 1px solid #eee; background: white; border-radius: 0 0 12px 12px; }
+    .chat-input input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; }
+    .chat-input button { padding: 10px 20px; background: #0078d7; color: white; border: none; border-radius: 8px; margin-right: 10px; cursor: pointer; }
+    .file-list { list-style: none; padding: 0; }
+    .file-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; transition: 0.2s; }
+    .file-item:hover { background: #f0f0f0; }
+    .file-name { font-weight: bold; }
+    .file-meta { font-size: 12px; color: #666; }
+    .upload-btn { display: block; width: 100%; padding: 10px; background: #28a745; color: white; border: none; border-radius: 8px; margin-top: 10px; cursor: pointer; }
+    .file-actions { margin-top: 8px; }
+    .file-actions button { margin-right: 5px; padding: 2px 8px; font-size: 12px; border: none; border-radius: 4px; cursor: pointer; }
+    .btn-view { background: #17a2b8; color: white; }
+    .btn-delete { background: #dc3545; color: white; }
+    .preview-box { background: #f8f9fa; padding: 10px; border-radius: 8px; margin-top: 10px; max-height: 300px; overflow-y: auto; font-size: 13px; white-space: pre-wrap; border: 1px solid #ddd; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <div class="sidebar">
+    <h3>📂 ملفات المشروع</h3>
+    <div id="fileListContainer">
+      <ul class="file-list" id="fileList"></ul>
+    </div>
+    <input type="file" id="fileInput" style="display:none" accept=".pdf,.xlsx,.xls">
+    <button class="upload-btn" onclick="document.getElementById('fileInput').click()">➕ رفع ملف جديد</button>
+    <div id="uploadStatus" style="margin-top:10px; font-size:13px; color:green;"></div>
+    <div id="previewContainer" style="display:none;">
+      <hr>
+      <h4>📄 معاينة الملف</h4>
+      <div id="previewContent" class="preview-box"></div>
+      <button onclick="closePreview()" style="margin-top:5px; padding:4px 12px;">إغلاق</button>
+    </div>
+  </div>
+
+  <div class="chat-area">
+    <div class="chat-header">💬 ELV Agent – اسأل عن أي شيء</div>
+    <div class="chat-messages" id="chatMessages">
+      <div class="message agent">مرحباً! أنا وكيل ELV. اسألني عن حالة الشقق، الكاميرات، أو ملفات المشروع.</div>
+    </div>
+    <div class="chat-input">
+      <input type="text" id="userInput" placeholder="اكتب سؤالك..." onkeypress="if(event.key==='Enter') sendMessage()">
+      <button onclick="sendMessage()">إرسال</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ============================================================
+  // إدارة الملفات
+  // ============================================================
+  async function loadFiles() {
+    const res = await fetch('/api/files');
+    const files = await res.json();
+    const list = document.getElementById('fileList');
+    list.innerHTML = '';
+    files.forEach(f => {
+      const li = document.createElement('li');
+      li.className = 'file-item';
+      li.innerHTML = `
+        <div class="file-name">${f.name}</div>
+        <div class="file-meta">${f.size_mb} MB | ${f.pages} صفحات | ${f.modified}</div>
+        <div class="file-actions">
+          <button class="btn-view" onclick="viewFile('${f.name}')">👁️ عرض</button>
+          <button class="btn-delete" onclick="deleteFile('${f.name}')">🗑️ حذف</button>
+        </div>
+      `;
+      list.appendChild(li);
+    });
+  }
+
+  async function viewFile(filename) {
+    const res = await fetch(`/api/files/view/${filename}`);
+    const data = await res.json();
+    if (data.error) {
+      alert(data.error);
+      return;
+    }
+    document.getElementById('previewContainer').style.display = 'block';
+    document.getElementById('previewContent').textContent = data.content;
+  }
+
+  function closePreview() {
+    document.getElementById('previewContainer').style.display = 'none';
+  }
+
+  async function deleteFile(filename) {
+    if (!confirm(`هل أنت متأكد من حذف الملف "${filename}"؟`)) return;
+    const res = await fetch(`/api/files/delete/${filename}`, { method: 'DELETE' });
+    const data = await res.json();
+    alert(data.message);
+    loadFiles();
+  }
+
+  document.getElementById('fileInput').addEventListener('change', async function(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const formData = new FormData();
+    formData.append('file', file);
+    const status = document.getElementById('uploadStatus');
+    status.textContent = '⏳ جاري الرفع...';
+    try {
+      const res = await fetch('/api/files/upload', { method: 'POST', body: formData });
+      const data = await res.json();
+      status.textContent = data.message;
+      loadFiles();
+    } catch(err) {
+      status.textContent = '❌ فشل الرفع: ' + err.message;
+    }
+    e.target.value = '';
+  });
+
+  // ============================================================
+  // المحادثة
+  // ============================================================
+  async function sendMessage() {
+    const input = document.getElementById('userInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
+
+    const chat = document.getElementById('chatMessages');
+    chat.innerHTML += `<div class="message user">${msg}</div>`;
+    chat.scrollTop = chat.scrollHeight;
+
+    try {
+      const res = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: msg })
+      });
+      const data = await res.json();
+      if (data.reply) {
+        chat.innerHTML += `<div class="message agent">${data.reply.replace(/\n/g, '<br>')}</div>`;
+      } else {
+        chat.innerHTML += `<div class="message agent">⚠️ لم أستطع معالجة طلبك.</div>`;
+      }
+    } catch(err) {
+      chat.innerHTML += `<div class="message agent">❌ خطأ: ${err.message}</div>`;
+    }
+    chat.scrollTop = chat.scrollHeight;
+  }
+
+  // تحميل الملفات عند فتح الصفحة
+  loadFiles();
+</script>
+</body>
+</html>س

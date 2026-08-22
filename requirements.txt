@@ -1,0 +1,9 @@
+openpyxl
+openai
+langchain-core
+langchain-groq
+langchain-openai
+python-dotenv
+flask
+werkzeug
+pymupdf
