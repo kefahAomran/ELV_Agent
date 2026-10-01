@@ -1,289 +1,354 @@
+"""
+Unified Excel Parser for ELV Project Progress
+Designed for: 128_ELV_work_Prograsse_tower_A.xlsx format
+"""
 import openpyxl
-import os
+from pathlib import Path
 
 # ============================================================
-# FILE PATHS — ضع ملفات الإكسل في نفس مجلد البرنامج
+# STAGE DEFINITIONS
 # ============================================================
-FILE_A = "ELV_work_Prograsse_tower_A.xlsx"
-FILE_B = "ELV_work_Prograsse_tower_B.xlsx"   # غيّر الاسم حسب الملف الفعلي
-
-# ============================================================
-# FLOOR MARKERS — هذه هي headers للطوابق في col0
-# ============================================================
-FLOOR_MARKERS = {
-    "Bassment 1", "Bassment 2", "Ground Floor", "poduim Floor",
-    "1 St floor", "2nd Floor", "3nd Floor", "4th Floor"
-}
-
-# أسماء للعرض (تصحيح الأخطاء الإملائية)
-FLOOR_DISPLAY = {
-    "Bassment 1":   "Basement 1",
-    "Bassment 2":   "Basement 2",
-    "Ground Floor": "Ground Floor",
-    "poduim Floor": "Podium Floor",
-    "1 St floor":   "1st Floor",
-    "2nd Floor":    "2nd Floor",
-    "3nd Floor":    "3rd Floor",
-    "4th Floor":    "4th Floor",
-}
-
-FLOOR_ORDER = [
-    "Bassment 1", "Bassment 2", "Ground Floor", "poduim Floor",
-    "1 St floor", "2nd Floor", "3nd Floor", "4th Floor"
+FLAT_STAGES = [
+    "DP_ONU_Status", "Ground_Pipe", "Wall_Pipe",
+    "Data_Wiring", "Intercom_Wiring", "Home_Automation_Wiring", "SAMATV_Wiring"
 ]
 
+FLOOR_STAGES = [
+    "Study_Design", "Supply_Materials", "Pipeline_Drilling", "Wiring",
+    "Install_Devices", "Configure_Devices", "System_Tuning", "Cable_Testing"
+]
+
+# Column indices for Flats sheet (Row 5 = headers)
+FLAT_STAGE_COLUMNS = {
+    4: "DP_ONU_Status",
+    5: "Ground_Pipe",
+    6: "Wall_Pipe",
+    7: "Data_Wiring",
+    9: "Intercom_Wiring",
+    11: "Home_Automation_Wiring",
+    13: "SAMATV_Wiring",
+}
+
+# Column indices for Floors sheet (Row 6 = stage headers)
+FLOOR_STAGE_COLUMNS = {
+    4: "Study_Design",
+    5: "Supply_Materials",
+    6: "Pipeline_Drilling",
+    7: "Wiring",
+    8: "Install_Devices",
+    9: "Configure_Devices",
+    10: "System_Tuning",
+    11: "Cable_Testing",
+}
+
 # ============================================================
-# STATUS NORMALIZATION
+# NORMALIZE STATUS
 # ============================================================
 def normalize_status(value):
+    """Convert any value to 'done' or 'pending'"""
     if not value:
         return "pending"
     v = str(value).strip().lower()
     if v in ("done", "✓"):
         return "done"
-    if "not" in v or "n/a" in v or "avail" in v:
+    if v in ("n/a", "not", "unavailable"):
         return "N/A"
     return "pending"
 
-# ============================================================
-# METADATA
-# ============================================================
-def extract_metadata(ws, tower_id):
-    rows = list(ws.iter_rows(min_row=1, max_row=3, values_only=True))
-    last_update = str(rows[1][3]).strip() if rows[1][3] else None
-    return {"tower": tower_id, "last_update": last_update}
 
 # ============================================================
-# SHEET: FLATS
+# METADATA EXTRACTION
 # ============================================================
-FLAT_STAGES = {
-    4:  "Marking",
-    5:  "DP_ONU_Status",
-    6:  "Cutting",
-    7:  "Wall_Box_Socket",
-    8:  "Ground_Pipe",
-    9:  "Pipe",
-    10: "Wiring_Data",
-    11: "Wiring_Intercom",
-    12: "Wiring_Home_Automation",
-    13: "Wiring_220v",
-}
+def extract_metadata(ws):
+    """Extract metadata from Flats/Floors sheet (rows 1-5)"""
+    # تهيئة جميع المتغيرات بقيم افتراضية
+    r1 = []
+    r2 = []
+    r3 = []
+    r4 = []
+    r5 = []
+    
+    # قراءة الصفوف بأمان
+    try:
+        r1 = [c.value for c in ws[1]] if len(ws) > 1 and ws[1] else []
+        r2 = [c.value for c in ws[2]] if len(ws) > 2 and ws[2] else []
+        r3 = [c.value for c in ws[3]] if len(ws) > 3 and ws[3] else []
+        r4 = [c.value for c in ws[4]] if len(ws) > 4 and ws[4] else []
+        r5 = [c.value for c in ws[5]] if len(ws) > 5 and ws[5] else []
+    except Exception:
+        pass
+    
+    # استخراج البرج (مع قيمة افتراضية)
+    tower = "A"
+    if len(r1) > 1 and r1[1]:
+        tower = str(r1[1]).strip()
+    
+    # استخراج آخر تحديث
+    last_update = None
+    for row in [r2, r3, r4]:
+        if row and len(row) > 1 and row[1]:
+            val_str = str(row[1]).strip()
+            if "/" in val_str or "-" in val_str:
+                last_update = val_str
+                break
+    
+    # استخراج Floor Num (الصف الخامس، العمود C)
+    floor_num_raw = None
+    if len(r5) > 2 and r5[2]:
+        floor_num_raw = str(r5[2]).strip()
+    
+    # استخراج project location (الصف الثالث، العمود C)
+    project_location = None
+    if len(r3) > 2 and r3[2]:
+        project_location = str(r3[2]).strip()
+    
+    # استخراج project code (الصف الأول، العمود C)
+    project_code = None
+    if len(r1) > 2 and r1[2]:
+        project_code = str(r1[2]).strip()
+    elif len(r1) > 0 and r1[0]:
+        project_code = str(r1[0]).strip()
+    
+    # استخراج project name (الصف الثاني، العمود C)
+    project_name = None
+    if len(r2) > 2 and r2[2]:
+        project_name = str(r2[2]).strip()
+    elif len(r2) > 0 and r2[0]:
+        project_name = str(r2[0]).strip()
+    
+    metadata = {
+        "tower": tower,
+        "last_update": last_update,
+        "project_code": project_code,
+        "project_name": project_name,
+        "project_location": project_location,
+        "floor_num": floor_num_raw,
+    }
+    
+    return metadata
 
-def parse_flats(ws, tower_id):
+
+# ============================================================
+# PARSE FLATS SHEET
+# ============================================================
+def parse_flats(ws):
+    """
+    Parse Flats sheet
+    Metadata: rows 1-4
+    Headers: row 5
+    Data: row 7+
+    """
     records = []
-    for row in ws.iter_rows(min_row=6, values_only=True):
+    for row in ws.iter_rows(min_row=7, values_only=True):
         flat_no = row[0]
-        if not isinstance(flat_no, (int, float)) or flat_no < 100:
+        
+        # Skip if empty or not a flat number
+        if not flat_no or not isinstance(flat_no, (int, float)):
             continue
+        
         record = {
-            "tower":    str(row[1]).strip().upper() if row[1] else tower_id,
+            "flat_no": int(flat_no),
+            "tower": str(row[1]).strip() if row[1] else None,
             "floor_no": int(row[2]) if isinstance(row[2], (int, float)) else None,
-            "flat_no":  int(flat_no),
             "flat_type": str(row[3]).strip() if row[3] else "",
         }
-        for col_idx, stage_name in FLAT_STAGES.items():
+        
+        # Add stage columns
+        for col_idx, stage_name in FLAT_STAGE_COLUMNS.items():
             val = row[col_idx] if len(row) > col_idx else None
             record[stage_name] = normalize_status(val)
-        record["notes"] = str(row[14]).strip() if len(row) > 14 and row[14] else None
+        
         records.append(record)
+    
     return records
 
-# ============================================================
-# SHEET: FLOORS
-# ============================================================
-FLOOR_STAGES = {
-    4:  "Study_Design",
-    5:  "Supply_Materials",
-    6:  "Pipeline_Drilling",
-    7:  "Wiring",
-    8:  "Install_Devices",
-    9:  "Configure_Devices",
-    10: "System_Tuning",
-    11: "Cable_Testing",
-}
 
-def parse_floors(ws, tower_id):
+# ============================================================
+# PARSE FLOORS SHEET
+# ============================================================
+def parse_floors(ws):
+    """
+    Parse Floors sheet
+    Metadata: rows 1-3
+    Headers: rows 4-6
+    Data: row 8+
+    """
     records = []
-    current_floor_key = None
-    current_system    = None
-
-    for row in ws.iter_rows(min_row=7, values_only=True):
-        col0 = str(row[0]).strip() if row[0] else None
-        col1 = row[1]
-
-        # Floor section header
-        if col0 in FLOOR_MARKERS:
-            current_floor_key = col0
-            current_system    = None
+    current_system = None
+    current_floor = None
+    
+    for row in ws.iter_rows(min_row=8, values_only=True):
+        system, point, location, details = row[0], row[1], row[2], row[3]
+        
+        # Forward-fill system name (merged cells pattern)
+        if system:
+            current_system = str(system).strip()
+        
+        # Forward-fill floor (from col 12)
+        if len(row) > 12 and row[12]:
+            current_floor = str(row[12]).strip()
+        
+        # Skip if no point name
+        if not point:
             continue
-
-        # System name header (col0 present, col1 may or may not be present)
-        if col0 and col0 not in FLOOR_MARKERS:
-            current_system = col0
-            if col1 is None:
-                continue   # header-only row, no data yet
-
-        # Skip empty rows
-        if col1 is None:
-            continue
-
+        
         record = {
-            "tower":      tower_id,
-            "floor_key":  current_floor_key,
-            "floor_name": FLOOR_DISPLAY.get(current_floor_key, current_floor_key) if current_floor_key else "Unknown",
-            "system":     current_system,
-            "point":      str(col1).strip(),
-            "location":   str(row[2]).strip() if row[2] else "",
-            "details":    str(row[3]).strip() if row[3] else None,
+            "system": current_system,
+            "point": str(point).strip(),
+            "location": str(location).strip() if location else "",
+            "details": str(details).strip() if details else None,
+            "floor": current_floor,
         }
-        for col_idx, stage_name in FLOOR_STAGES.items():
+        
+        # Add stage columns
+        for col_idx, stage_name in FLOOR_STAGE_COLUMNS.items():
             val = row[col_idx] if len(row) > col_idx else None
             record[stage_name] = normalize_status(val)
+        
+        # Notes (col 14)
         record["notes"] = str(row[14]).strip() if len(row) > 14 and row[14] else None
         records.append(record)
-
+    
     return records
 
-# ============================================================
-# SUMMARY HELPERS
-# ============================================================
-FLAT_STAGE_NAMES = list(FLAT_STAGES.values())
-FLOOR_STAGE_NAMES = list(FLOOR_STAGES.values())
 
-def _stage_stats(records, stage_names):
-    total = len(records)
-    result = {}
-    for s in stage_names:
-        done = sum(1 for r in records if r.get(s) == "done")
-        result[s] = {
+# ============================================================
+# SUMMARY FUNCTIONS
+# ============================================================
+def get_flats_summary(flats_meta, flats_records):
+    """Compute progress summary for all flats"""
+    total = len(flats_records)
+    stage_stats = {}
+    
+    for stage in FLAT_STAGES:
+        done = sum(1 for r in flats_records if r.get(stage) == "done")
+        stage_stats[stage] = {
             "done": done,
             "pending": total - done,
-            "progress_%": round(done / total * 100, 1) if total else 0
+            "progress_%": round((done / total) * 100, 1) if total else 0
         }
-    return result
-
-
-def get_flats_summary(all_flats, tower_filter=None, floor_filter=None):
-    recs = all_flats
-    if tower_filter:
-        recs = [r for r in recs if r["tower"].upper() == tower_filter.upper()]
-    if floor_filter is not None:
-        recs = [r for r in recs if r["floor_no"] == int(floor_filter)]
-    total = len(recs)
+    
     return {
-        "tower": tower_filter.upper() if tower_filter else "All",
-        "floor": floor_filter or "All",
+        "tower": flats_meta.get("tower"),
+        "last_update": flats_meta.get("last_update"),
         "total_flats": total,
-        "stages": _stage_stats(recs, FLAT_STAGE_NAMES)
+        "stages": stage_stats
     }
 
 
-def get_floors_summary(all_floors, tower_filter=None, system_filter=None, floor_filter=None):
-    recs = all_floors
-    if tower_filter:
-        recs = [r for r in recs if r["tower"].upper() == tower_filter.upper()]
+def get_floors_summary(floors_meta, floors_records, system_filter=None):
+    """Compute progress summary for systems/floors"""
+    records = floors_records
     if system_filter:
-        s = system_filter.strip().upper()
-        recs = [r for r in recs if r["system"] and r["system"].strip().upper() == s]
-    if floor_filter:
-        f = floor_filter.strip().lower()
-        recs = [r for r in recs if r["floor_name"] and r["floor_name"].lower() == f]
-    total = len(recs)
+        records = [r for r in records if r["system"] == system_filter]
+    
+    total = len(records)
+    stage_stats = {}
+    
+    for stage in FLOOR_STAGES:
+        done = sum(1 for r in records if r.get(stage) == "done")
+        stage_stats[stage] = {
+            "done": done,
+            "pending": total - done,
+            "progress_%": round((done / total) * 100, 1) if total else 0
+        }
+    
     return {
-        "tower":        tower_filter.upper() if tower_filter else "All",
-        "system":       system_filter or "All Systems",
-        "floor":        floor_filter or "All Floors",
+        "tower": floors_meta.get("tower"),
+        "last_update": floors_meta.get("last_update"),
+        "system": system_filter or "All Systems",
         "total_points": total,
-        "stages":       _stage_stats(recs, FLOOR_STAGE_NAMES)
+        "stages": stage_stats
     }
 
 
-def get_flat_by_number(all_flats, flat_no, tower_filter=None):
-    fn = int(flat_no)
-    for r in all_flats:
-        if r["flat_no"] == fn:
-            if tower_filter and r["tower"].upper() != tower_filter.upper():
-                continue
-            return r
+def get_flat_by_number(flats_records, flat_no):
+    """Find a specific flat by number"""
+    try:
+        fn = int(flat_no)
+        for r in flats_records:
+            if r["flat_no"] == fn:
+                return r
+    except (ValueError, TypeError):
+        pass
     return None
 
 
-def get_floors_list(all_floors, tower_filter=None):
-    """Returns ordered list of unique floor display names in a tower."""
-    recs = all_floors
-    if tower_filter:
-        recs = [r for r in recs if r["tower"].upper() == tower_filter.upper()]
-    seen = []
-    for key in FLOOR_ORDER:
-        display = FLOOR_DISPLAY[key]
-        if any(r["floor_key"] == key for r in recs):
-            if display not in seen:
-                seen.append(display)
-    return seen
-
-
-def get_systems_list(all_floors, tower_filter=None, floor_filter=None):
-    """Returns unique system names found in given tower/floor."""
-    recs = all_floors
-    if tower_filter:
-        recs = [r for r in recs if r["tower"].upper() == tower_filter.upper()]
-    if floor_filter:
-        f = floor_filter.strip().lower()
-        recs = [r for r in recs if r["floor_name"] and r["floor_name"].lower() == f]
+def get_systems_list(floors_records):
+    """Get unique systems from floors"""
     systems = []
-    for r in recs:
+    for r in floors_records:
         if r["system"] and r["system"] not in systems:
             systems.append(r["system"])
     return systems
 
 
-def count_points(all_floors, tower_filter, system_filter, floor_filter):
-    recs = all_floors
-    if tower_filter:
-        recs = [r for r in recs if r["tower"].upper() == tower_filter.upper()]
-    if system_filter:
-        s = system_filter.strip().upper()
-        recs = [r for r in recs if r["system"] and r["system"].strip().upper() == s]
-    if floor_filter:
-        f = floor_filter.strip().lower()
-        recs = [r for r in recs if r["floor_name"] and r["floor_name"].lower() == f]
-    return len(recs)
+def get_floors_list(floors_records):
+    """Get unique floors from floors data"""
+    floors = []
+    for r in floors_records:
+        if r["floor"] and r["floor"] not in floors:
+            floors.append(r["floor"])
+    return sorted(floors)
 
 
 # ============================================================
-# LOAD DATA ONCE ON IMPORT
+# LOAD PROJECT DATA
 # ============================================================
-all_flats  = []
-all_floors = []
-loaded_towers = []
+def load_project_data(progress_file_path):
+    """
+    Load data from a project's Progress Excel file
+    Returns: (flats_meta, flats, floors_meta, floors)
+    """
+    if not Path(progress_file_path).exists():
+        raise FileNotFoundError(f"Progress file not found: {progress_file_path}")
+    
+    wb = openpyxl.load_workbook(progress_file_path, data_only=True)
+    
+    flats_meta = extract_metadata(wb["Flats"])
+    flats = parse_flats(wb["Flats"])
+    
+    floors_meta = extract_metadata(wb["Floors"])
+    floors = parse_floors(wb["Floors"])
+    
+    if "floor_num" in flats_meta and flats_meta["floor_num"]:
+        flats_meta["floor_num_parsed"] = parse_floor_num(flats_meta["floor_num"])
+    
+    return flats_meta, flats, floors_meta, floors
 
-# Tower A
-if os.path.exists(FILE_A):
-    wb_a = openpyxl.load_workbook(FILE_A, data_only=True)
-    sheets_a = wb_a.sheetnames
-    flats_sheet_a  = next((s for s in sheets_a if "flat" in s.lower()), None)
-    floors_sheet_a = next((s for s in sheets_a if "floor" in s.lower()), None)
-    if flats_sheet_a:
-        all_flats  += parse_flats(wb_a[flats_sheet_a], "A")
-    if floors_sheet_a:
-        all_floors += parse_floors(wb_a[floors_sheet_a], "A")
-    loaded_towers.append("A")
-
-# Tower B (optional)
-if os.path.exists(FILE_B):
-    wb_b = openpyxl.load_workbook(FILE_B, data_only=True)
-    sheets_b = wb_b.sheetnames
-    flats_sheet_b  = next((s for s in sheets_b if "flat" in s.lower()), None)
-    floors_sheet_b = next((s for s in sheets_b if "floor" in s.lower()), None)
-    if flats_sheet_b:
-        all_flats  += parse_flats(wb_b[flats_sheet_b], "B")
-    if floors_sheet_b:
-        all_floors += parse_floors(wb_b[floors_sheet_b], "B")
-    loaded_towers.append("B")
-
-
-    # ============================================================
-# Aliases for backward compatibility
-# ============================================================
-flats = all_flats
-floors = all_floors
+def parse_floor_num(floor_num_str: str) -> dict:
+    """
+    تحليل نص Floor Num مثل: "10L+1roof+2Bassment"
+    يعيد: {"living": 10, "roof": 1, "basement": 2, "total": 13}
+    """
+    if not floor_num_str:
+        return None
+    
+    result = {
+        "living": 0,
+        "roof": 0,
+        "basement": 0,
+        "other": 0,
+        "total": 0
+    }
+    import re
+    
+    # Living floors (L)
+    living_match = re.search(r'(\d+)\s*L', floor_num_str, re.IGNORECASE)
+    if living_match:
+        result["living"] = int(living_match.group(1))
+    
+    # Roof
+    roof_match = re.search(r'(\d+)\s*roof', floor_num_str, re.IGNORECASE)
+    if roof_match:
+        result["roof"] = int(roof_match.group(1))
+    
+    # Basement
+    basement_match = re.search(r'(\d+)\s*Bassment', floor_num_str, re.IGNORECASE)
+    if basement_match:
+        result["basement"] = int(basement_match.group(1))
+    
+    # حساب الإجمالي
+    result["total"] = result["living"] + result["roof"] + result["basement"]
+    
+    return result

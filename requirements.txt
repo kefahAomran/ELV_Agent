@@ -7,3 +7,7 @@ python-dotenv
 flask
 werkzeug
 pymupdf
+streamlit
+pandas
+reportlab
+matplotlib
